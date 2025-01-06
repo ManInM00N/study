@@ -66,16 +66,22 @@ func Task() {
 				}
 			case <-notification.C:
 				{
-					fmt.Printf("执行进度 %d/%d %d %% \n", progress, Len, 100*progress/Len)
+					fmt.Printf("执行进度 %d/%d %d%% \n", progress, Len, 100*progress/Len)
 				}
 			}
 		}
 	}()
-
+	client := http.Client{
+		Timeout: time.Second * 5,
+		Transport: &http.Transport{
+			TLSHandshakeTimeout: time.Second * 5,
+		},
+	}
 	raw.Seek(0, 0)
 	safe := int64(0)
 	var line []string
 	_, _ = reader.Read()
+	var GLock, BLock sync.RWMutex
 	for {
 		line, err = reader.Read()
 		if err != nil {
@@ -89,23 +95,20 @@ func Task() {
 			task <- nil
 			defer wg.Done()
 			defer func() { <-task }()
-			// 不使用pool
-			//client := http.Client{
-			//	Timeout: time.Second * 10,
-			//	Transport: &http.Transport{
-			//		TLSHandshakeTimeout: time.Second * 10,
-			//	},
-			//}
 			// 使用pool
-			client := pool.Get().(http.Client) // 如果是第一个调用，则创建一个缓冲区
-			defer pool.Put(client)             // 将缓冲区放回 sync.Pool中
+			//client := pool.Get().(http.Client) // 如果是第一个调用，则创建一个缓冲区
+			//defer pool.Put(client)             // 将缓冲区放回 sync.Pool中
 			resp, err := client.Get(url)
 			defer atomic.AddInt64(&progress, 1)
 			if err != nil || resp.StatusCode != http.StatusOK {
+				BLock.Lock()
+				defer BLock.Unlock()
 				badwriter.Write(raw)
 				badwriter.Flush()
 				return
 			}
+			GLock.Lock()
+			defer GLock.Unlock()
 			goodwriter.Write(raw)
 			goodwriter.Flush()
 			defer resp.Body.Close()
@@ -118,6 +121,7 @@ func Task() {
 }
 func main() {
 	timer := time.NewTicker(time.Hour * 1)
+	// 使用pool确实多此一举
 	pool = &sync.Pool{
 		New: func() interface{} {
 			return http.Client{
