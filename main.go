@@ -39,7 +39,7 @@ func Task() {
 	}()
 	reader := csv.NewReader(raw)
 	_, err = reader.Read()
-	Len := int64(0)
+	Len := 0
 	for {
 		_, err = reader.Read()
 		if err != nil {
@@ -53,10 +53,10 @@ func Task() {
 	wg := sync.WaitGroup{}
 	goodwriter := csv.NewWriter(good)
 	badwriter := csv.NewWriter(bad)
-	progress := int64(0)
 	notification := time.NewTicker(time.Second * 5)
 	done := make(chan any)
 	task := make(chan any, 100)
+	progress := make(chan any, 5000)
 	go func() {
 		for {
 			select {
@@ -66,7 +66,7 @@ func Task() {
 				}
 			case <-notification.C:
 				{
-					fmt.Printf("执行进度 %d/%d %d%% \n", progress, Len, 100*progress/Len)
+					fmt.Printf("执行进度 %d/%d %d%% \n", len(progress), Len, 100*len(progress)/Len)
 				}
 			}
 		}
@@ -95,11 +95,8 @@ func Task() {
 			task <- nil
 			defer wg.Done()
 			defer func() { <-task }()
-			// 使用pool
-			//client := pool.Get().(http.Client) // 如果是第一个调用，则创建一个缓冲区
-			//defer pool.Put(client)             // 将缓冲区放回 sync.Pool中
 			resp, err := client.Get(url)
-			defer atomic.AddInt64(&progress, 1)
+			progress <- nil
 			if err != nil || resp.StatusCode != http.StatusOK {
 				BLock.Lock()
 				defer BLock.Unlock()
@@ -120,23 +117,8 @@ func Task() {
 	fmt.Printf("Good URL ：%d \n", safe)
 }
 func main() {
-	timer := time.NewTicker(time.Hour * 1)
-	// 使用pool确实多此一举
-	pool = &sync.Pool{
-		New: func() interface{} {
-			return http.Client{
-				Timeout: time.Second * 5,
-				Transport: &http.Transport{
-					TLSHandshakeTimeout: time.Second * 5,
-				},
-			}
-		},
-	}
-	for {
-		start := time.Now()
-		fmt.Println("开始执行任务")
-		Task()
-		fmt.Printf("共计用时：%v \n", time.Now().Sub(start))
-		<-timer.C
-	}
+	start := time.Now()
+	fmt.Println("开始执行任务")
+	Task()
+	fmt.Printf("共计用时：%v \n", time.Now().Sub(start))
 }
