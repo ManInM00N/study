@@ -23,7 +23,7 @@ sync.pool 魅力时刻 :tada:
 
 
 update: 1/6<br>
-笔者并未发现client是并发安全的， 重新运行发现，使用pool 多此一举:clown_face:<br>
+笔者并未发现client是并发安全的， 重新运行发现，使用pool 多此一举 :clown_face: <br>
 早上起来一看校园网变好了，5s超时 命中率也接近6/7了
 
 超时时间5s ， 握手超时5s 35  \pm 5s 命中率约6/7 <br>
